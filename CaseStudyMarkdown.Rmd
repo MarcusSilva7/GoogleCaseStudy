@@ -1,0 +1,409 @@
+---
+title: "Google Cyclistic Case Study"
+author: "Marcus Silva"
+date: "2021/07/12"
+output: html_document
+---
+```{r, echo=FALSE}
+knitr::opts_chunk$set(error = TRUE)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(fig.width = 10)
+```
+
+## Scenario  
+
+You are a junior data analyst working in the marketing analyst team at Cyclistic, a bike-share company in Chicago. The director of marketing believes the company’s future success depends on maximizing the number of annual memberships. Therefore, your team wants to understand how casual riders and annual members use Cyclistic bikes differently. From these insights, your team will design a new marketing strategy to convert casual riders into annual members. But first, Cyclistic executives must approve your recommendations, so they must be backed up with compelling data insights and professional data visualizations.
+
+## Characters and teams  
+**Cyclistic:** A bike-share program that features more than 5,800 bicycles and 600 docking stations. Cyclistic sets itself apart by also offering reclining bikes, hand tricycles, and cargo bikes, making bike-share more inclusive to people with disabilities and riders who can't use a standard two-wheeled bike. The majority of riders opt for traditional bikes; about 8% of riders use the assistive options. Cyclistic users are more likely to ride for leisure, but about 30% use them to commute to work each day.  
+**Lily Moreno:** The director of marketing and your manager. Moreno is responsible for the development of campaigns and initiatives to promote the bike-share program. These may include email, social media, and other channels.  
+**Cyclistic marketing analytics team:** A team of data analysts who are responsible for collecting, analyzing, and reporting data that helps guide Cyclistic marketing strategy. You joined this team six months ago and have been busy learning about Cyclistic's mission and business goals — as well as how you, as a junior data analyst, can help Cyclistic achieve them.  
+**Cyclistic executive team:** The notoriously detail-oriented executive team will decide whether to approve the recommended marketing program.  
+
+
+*This analysis will follow the __"Ask, Prepare, Process, Analyze, Share, and Act"__ process.*  
+
+### Ask:
+
+Three questions will guide the future marketing program:  
+1. How do annual members and casual riders use Cyclistic bikes differently?    
+2. Why would casual riders buy Cyclistic annual memberships?  
+3. How can Cyclistic use digital media to influence casual riders to become members?  
+
+Moreno has assigned you the first question to answer: How annual members and casual riders use Cyclistic bikes differently?  
+
+You will produce a report with the following deliverables:  
+1. A clear statement of the business task;  
+2. A description of all data sources used;  
+3. Documentation of any cleaning or manipulation of data;  
+4. A summary of your analysis;  
+5. Supporting visualizations and key findings;  
+6. Your top three recommendations based on your analysis.  
+
+**Guiding questions**  
+  
+  * What is the problem you are trying to solve?  
+  How can the company turn casual riders into annual members.  
+  
+  * How can your insights drive business decisions?  
+  Gathering enough data and analyzing it will allow the company to make the right changes.  
+
+**Key tasks:**  
+1. Identify the business task;  
+2. Consider key stakeholders.    
+
+**Deliverable: A clear statement of the business task.**  
+How to turn casual riders into annual members and how digital media could play a part in this.  
+
+
+### Prepare:  
+
+**Guiding questions:**  
+
+* Where is your data located?  
+  The data was made available by Motivate International Inc. [Here](https://divvy-tripdata.s3.amazonaws.com/index.html)
+
+* How is the data organized?  
+  The data is divided and organized by month in multiple CSV documents.
+
+* Are there issues with bias or credibility in this data? Does your data __*ROCCC*__?  
+  The data is collected directly from the customers' usage of the bike-sharing service, therefore neither bias or credibility is a problem. And the data is __*Reliable, Original, Comprehensive, Current and Cited(ROCCC)*__.
+
+* How are you addressing licensing, privacy, security, and accessibility?  
+  The data is licensed by the company, plus the data set doesn't contain any personal information regarding its costumers. [License](https://www.divvybikes.com/data-license-agreement)
+
+* How did you verify the data’s integrity?  
+Every file maintains a consistent format with coherent data types in each of its columns.
+
+* How does it help you answer your question?  
+The data contains relevant information that can lead to insights about the customers and how they use the service.
+
+* Are there any problems with the data?  
+The data has some minor issues, but they don't interfere with the overall analysis. 
+
+
+**Key tasks:**  
+1. Download data and store it appropriately;  
+2. Identify how it’s organized;  
+3. Sort and filter the data;  
+4. Determine the credibility of the data.
+
+**Deliverable: A description of all data sources used.**  
+All data sources are detailed above.
+
+### Process:  
+
+Setting up the environment for the analysis.  
+**Tidyverse** for data manipulation, exploration and visualization.  
+**Data Table** only for a faster way to save the data set.  
+```{r message = FALSE}
+library(tidyverse)
+library(data.table)
+```
+
+Merging all the data from June/2020 ~ May/2021, and getting a glimpse of it.  
+```{r message = FALSE}
+csv_data <- list.files(path = getwd(), pattern = "divvy", recursive = TRUE, full.names = TRUE)
+cyclistic_data <- do.call(rbind, lapply(csv_data, read_csv))
+```
+
+```{r}
+head(cyclistic_data)
+```
+
+Looking for duplicated data.  
+```{r}
+print(paste("There are", sum(duplicated(cyclistic_data$ride_id)), "duplicated rows in the data set"))
+```
+
+Removing the duplicates.  
+```{r}
+cyclistic_clean <- cyclistic_data[!duplicated(cyclistic_data$ride_id), ]
+print(paste(sum(duplicated(cyclistic_data$ride_id)), "rows were removed"))
+```
+
+Adjusting the date: Year/Month, Weekday, and Hour of the day.  
+```{r}
+cyclistic_clean <- cyclistic_clean %>% 
+  mutate(year_month = paste(strftime(cyclistic_clean$started_at, "%Y"),
+                            "-", strftime(cyclistic_clean$started_at, "%m")))
+unique(cyclistic_clean$year_month)
+
+cyclistic_clean <- cyclistic_clean %>% 
+  mutate(weekday = paste(strftime(cyclistic_clean$started_at, "%a")))
+unique(cyclistic_clean$weekday)
+
+cyclistic_clean <- cyclistic_clean %>% 
+  mutate(hour_of_day = paste(strftime(cyclistic_clean$started_at, "%H", tz = "UTC")))
+unique(cyclistic_clean$hour_of_day)
+```
+
+Adding the duration of the rides in minutes. 
+```{r}
+cyclistic_clean <- cyclistic_clean %>% 
+  mutate(ride_time_in_m = as.numeric(cyclistic_clean$ended_at - cyclistic_clean$started_at) / 60)
+summary(cyclistic_clean$ride_time_in_m)
+```
+There are negative and over 54,000 minutes long rides. Something must have gone wrong for these inputs to happen. Let's correct them.  
+```{r}
+quantile(cyclistic_clean$ride_time_in_m)
+```
+From 25% through 75% the numbers seem to make sense. Let's take a closer look.  
+```{r}
+quantile(cyclistic_clean$ride_time_in_m, seq(0, 1, by = 0.05))
+```
+Now it makes much more sense. Let's filter out the inaccurate data.  
+```{r}
+cyclistic_clean_v2 <- cyclistic_clean %>% 
+  filter(ride_time_in_m > quantile(ride_time_in_m, 0.05)) %>% 
+  filter(ride_time_in_m < quantile(ride_time_in_m, 0.95))
+print(paste(nrow(cyclistic_clean) - nrow(cyclistic_clean_v2), "inaccurate rows were removed"))  
+```
+Quick look at the summary again.  
+```{r}
+summary(cyclistic_clean_v2$ride_time_in_m)
+```
+
+Saving the clean data set.
+```{r message = FALSE}
+fwrite(cyclistic_clean_v2, "cyclistic_clean_v2.csv")
+```
+
+**Guiding questions:**   
+
+* What tools are you choosing and why?  
+I'm using R because it's suitable for the size of the data set I'll analyze, and R Markdown for a clear demonstration of the process.  
+
+* Have you ensured your data’s integrity?  
+Every column has consistent information with proper data types.  
+
+* What steps have you taken to ensure that your data is clean?  
+Removed duplicated rows and added a few columns to facilitate the analysis process.
+
+* How can you verify that your data is clean and ready to analyze?  
+The whole data set has consistent data and all the necessary information for the analysis.  
+
+* Have you documented your cleaning process so you can review and share those results?  
+Every step done has been specified and documented.  
+
+**Key tasks:**   
+1. Check the data for errors;  
+2. Choose your tools;  
+3. Transform the data so you can work with it effectively;  
+4. Document the cleaning process
+
+**Deliverable: Documentation of any cleaning or manipulation of data.**  
+Every cleaning and manipulation step has been documented above.
+
+
+### Analyze:  
+
+Removing some of the columns we won't need for the analysis.  
+```{r}
+df <- cyclistic_clean_v2 %>% 
+  select(-c(start_lat, end_lat, start_lng, end_lng))
+```
+Let's compare memmbers and casual riders.  
+```{r}
+aggregate(df$ride_time_in_m ~ df$member_casual, FUN = mean)
+aggregate(df$ride_time_in_m ~ df$member_casual, FUN = median)
+aggregate(df$ride_time_in_m ~ df$member_casual, FUN = max)
+aggregate(df$ride_time_in_m ~ df$member_casual, FUN = min)
+```
+Average ride duration during weekdays:  
+```{r}
+aggregate(df$ride_time_in_m ~ df$member_casual + df$weekday, FUN = mean)
+```
+The days are not in order. Let's fix that.  
+```{r}
+df$weekday <- ordered(df$weekday, levels=c("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"))
+aggregate(df$ride_time_in_m ~ df$member_casual + df$weekday, FUN = mean)
+```
+Casuals tend to have slightly longer rides.  
+
+How about the number of rides by day of the week?
+```{r warning = FALSE}
+df %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n(), average_duration = mean(ride_time_in_m), .groups = "drop") %>% 
+  arrange(member_casual, weekday) 
+```
+Members ride twice as much as casuals with the exception of weekends.  
+
+Now let's see at what time of the day the rides happen.  
+```{r}
+df %>% 
+  group_by(member_casual, hour_of_day) %>% 
+  summarise(number_of_rides = n(), .groups = "drop") %>% 
+  arrange(member_casual, hour_of_day)
+```
+From morning to early evening is when the majority of rides happen for members, on the other hand, casuals seem to prefer the afternoon to early evening.  
+
+Let's see how that works for business days and weekends.
+```{r}
+df %>% 
+  mutate(day = ifelse(weekday == "Sat" | weekday == "Sun", "weekend", "weekday")) %>% 
+  group_by(member_casual, hour_of_day, day) %>% 
+  summarise(number_of_rides = n(), .groups = "drop") %>% 
+  arrange(member_casual, hour_of_day)
+```
+On business days there's a big disparity between the times members and casuals use the service, but on weekends it's quite uniform.  
+
+Finally let's see what months are the busiest.  
+```{r}
+df %>% 
+  group_by(member_casual, year_month) %>% 
+  summarise(number_of_rides = n(), .groups = "drop") %>% 
+  arrange(member_casual, year_month)
+```
+Unsurprisingly the warmer months are the busiest for both casuals and members.  
+
+Now that we got a better understanding of how the service is used, let's translate it into visualizations.
+
+
+**Guiding questions:**  
+
+* How should you organize your data to perform analysis on it?  
+The most relevant data points for this analysis will be membership status, ride duration, and date(month, weekday, and hour of the day).  
+
+* Has your data been properly formatted?  
+Every column contains the proper data format.  
+
+* What surprises did you discover in the data?  
+Casual riders average ride duration is about 150% longer than the members.  
+
+* What trends or relationships did you find in the data?  
+  - Weather plays a big part in the number of rides;  
+  - Casuals ride the most on weekends;  
+  - Members have a consistent ride duration;  
+  - Members seem to use the bicycles on set schedules, and the casuals mostly ride for leisure based on time and day of the week.  
+
+
+* How will these insights help answer your business questions?  
+These insights greatly help identify what each group looks for when using the service. With that in mind we can better elaborate a marketing strategy to attract casuals to become members.  
+
+**Key tasks:**  
+1. Aggregate your data so it’s useful and accessible.  
+2. Organize and format your data.  
+3. Perform calculations.  
+4. Identify trends and relationships.  
+
+**Deliverable: A summary of your analysis.**  
+Every step of the analysis has been documented above.
+
+### Share:  
+
+Now we'll take a look at a few visualizations:
+```{r echo = FALSE, fig.align='center'}
+df %>% 
+  group_by(member_casual, weekday) %>% 
+  summarise(number_of_rides = n(), average_duration = mean(ride_time_in_m), .groups = "drop") %>% 
+  arrange(member_casual, weekday) %>% 
+  ggplot(aes(x = weekday, y = average_duration, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Average Ride Duration Throughout the Week", 
+       x = "Day of the Week", y = "Duration in Minutes", 
+       fill = "Member x Casual")
+```
+As mentioned before, casuals on average take longer rides than members. But that by itself doesn't mean much. Let's explore further.  
+
+```{r echo = FALSE, fig.align='center'}
+df %>% 
+  group_by(member_casual, hour_of_day) %>% 
+  summarise(number_of_rides = n(), .groups = "drop") %>% 
+  arrange(member_casual, hour_of_day) %>% 
+  ggplot(aes(x = hour_of_day, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Number of Rides Throughout the Day", 
+       x = "Hour of the Day", y = "Number of Rides", 
+       fill = "Member x Casual")
+```
+Here you can see that members start riding at around 6:00 and maintain a pretty constant usage until 16:00 ~ 18:00 where it peaks and then drops quickly afterwards. For casuals, the rides start a bit later at 10:00 and follow a similar pattern to the members but in a smaller proportion, but late at night up until 4:00 they actually have a higher volume of rides.  
+```{r echo = FALSE, fig.align='center'}
+df %>% 
+  mutate(day = ifelse(weekday == "Sat" | weekday == "Sun", "weekend", "weekday")) %>% 
+  group_by(member_casual, hour_of_day, day) %>% 
+  summarise(number_of_rides = n(), .groups = "drop") %>% 
+  arrange(member_casual, hour_of_day) %>% 
+  ggplot(aes(x = hour_of_day, y= number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  facet_grid(~ day) +
+  labs(title = "Number of Rides: Weekday x Weekend", 
+       x = "Hour of the Day", y = "Number of Rides", 
+       fill = "Member x Casual")
+```
+In this graph it becomes very clear where the disparity happens between the two groups. During weekdays, members most likely use Cyclistic bikes for commuting to and from work which explains the peaks of usage in the morning and early evening. As for casuals, the weekends seem to be the time in which they go for rides in their free time and actually have a higher volume of rides than members. That is a key information to understand what appeals to the casual audience.  
+
+```{r echo = FALSE, fig.align='center'}
+df %>% 
+  group_by(member_casual, year_month) %>% 
+  summarise(number_of_rides = n(), .groups = "drop") %>% 
+  arrange(member_casual, year_month) %>% 
+  ggplot(aes(x = year_month, y = number_of_rides, fill = member_casual)) +
+  geom_col(position = "dodge") +
+  labs(title = "Number of Rides by Month", 
+       x = "Year/Month", y = "Number of Rides", 
+       fill = "Member x Casual")
+```
+And on this last graph we see the power of the seasons. The summer season has the vast majority of rides throughout the year which isn't surprising but actually a point to take into consideration. Having such a dip in rides when winter arrives can be an interesting aspect to play around. 
+
+**Guiding questions:**  
+
+* Were you able to answer the question of how annual members and casual riders use Cyclistic bikes differently?  
+Yes, members mostly use the service on set schedules such as mornings and afternoons, while casuals don't really have a specific time in which they use the bicycles as they use them for leisure, especially on weekends.  
+
+* What story does your data tell?  
+It shows that people find different uses for the same tools, be it riding bicycles or any other activity.  
+
+* How do your findings relate to your original question?
+They are directly related. The manner in which members and casuals use the service differently basically communicates lots of information and gives plenty of insights regarding their needs. With that in mind we can elaborate the best way to turn casuals into members.  
+
+* Who is your audience? What is the best way to communicate with them?  
+The director of marketing Lily Moreno and the Cyclistic executive team, and the best way to communicate with them is through compelling data-driven visualizations.  
+
+* Can data visualization help you share your findings?  
+Visualizations help translate data into easily understandable insights.  
+
+* Is your presentation accessible to your audience?  
+Every visualization uses clear and distinct colour patterns with concise and comprehensive labels.  
+
+**Key tasks:**  
+1. Determine the best way to share your findings.  
+2. Create effective data visualizations.  
+3. Present your findings.  
+4. Ensure your work is accessible.  
+
+**Deliverable: Supporting visualizations and key findings.**
+
+
+### Act:  
+**Guiding questions:**  
+
+* What is your final conclusion based on your analysis?  
+Members and Casuals have distinct needs for riding bicycles based on the analysis of the data.  
+ 
+* How could your team and business apply your insights?  
+With all the gathered data the team can elaborate on marketing campaigns to attract casuals riders.  
+
+* What next steps would you or your stakeholders take based on your findings?  
+Extra work can always be done to further improve the findings, but with the current data, in addition to the other members researches, a proper campaign can be done to attract casuals into becoming members.  
+
+* Is there additional data you could use to expand on your findings?  
+Perhaps age and gender could also play a big role in how people use the service.  
+
+**Deliverable: Your top three recommendations based on your analysis.**  
+
+1. Create a "Leisure Membership", a cheaper option than the regular annual membership that can be of interest to multiple riders who enjoy to ride around mostly in their free time. This membership would allow members to ride freely on weekends and holidays without worrying about the bothersome payment process for each and every ride they go on. This would also mean more consistency for casual ridership given the fact that weekends are already a popular time for them to use Cyclistic.  
+
+2. Create a campaign to encourage people to use a more eco-friendly and healthier transportation for their daily commute.  
+
+3. Provide some sort of advantage to ride during the "slower" months of the year. Given the fact that the volume is already pretty low, any progress would be welcome. This is also a place where the digital media could play a big part. Providing a list of benefits of riding during the winter season.  
+
+Extra. Provide a free trial period. Very often when people use a premium version of a product they already use, the moment they go back they notice the loss of certain minor perks and benefits which in the long run make a big difference.  
+
